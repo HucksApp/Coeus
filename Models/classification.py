@@ -11,7 +11,7 @@ from torch.utils.data import random_split
 from torch.utils.data import DataLoader, Dataset  # Data handling classes
 import torch.optim as optim
 
-class CoeusClassification(nn.Module):  # Inheriting from nn.Module instead of resnet50 function
+class CoeusClassification(nn.Module):  # Inheriting from nn.Module
 
     def __init__(self, training=False, dataset_path=None, save_dir=None):
         super(CoeusClassification, self).__init__()
