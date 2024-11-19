@@ -227,7 +227,7 @@ class CoeusGenerative(nn.Module):
 
 
 
-# Example usage:
+# usage:
 # coeus = CoeusGenerative(training=True, dataset_path="path/to/texts.json", save_dir="./Models", title="GenerativeModel")
 # coeus.train_model(epochs_per_run=3)
 # answer = coeus.generate_answer("How do I troubleshoot an engine fault?")
