@@ -78,7 +78,7 @@ class CoeusImageGenerative:
             raise RuntimeError(f"Error loading the pipeline: {e}")
 
     ### TRAINING ###
-    def train_progressive(self, dataset, epochs=1, save_checkpoints=True):
+    def train_in_progressive(self, dataset, epochs=1, save_checkpoints=True):
         """
         Fine-tune the pipeline on a custom dataset (text-image pairs).
         Dataset should be a PyTorch DataLoader.

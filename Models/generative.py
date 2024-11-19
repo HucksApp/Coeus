@@ -99,7 +99,7 @@ class CoeusGenerative(nn.Module):
             return self.TextDataset(self.tokenizer, texts)
 
     ### TRAINING ###
-    def train_progessive(self, epochs_per_run=3, batch_size=8):
+    def train_in_progessive(self, epochs_per_run=3, batch_size=8):
         dataset = self.create_text_dataset()
         train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         checkpoint_path = os.path.join(self.save_dir, "progress_checkpoint.pth")
