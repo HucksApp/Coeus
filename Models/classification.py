@@ -120,7 +120,6 @@ class CoeusClassification(nn.Module):
             brand_dataset.classes = all_classes
             brand_dataset.class_to_idx = {
                 cls: idx for idx, cls in enumerate(all_classes)}
-
             return brand_dataset
 
     ### TRAINING ###
@@ -235,12 +234,9 @@ class CoeusClassification(nn.Module):
                 other_model.classifier[1].in_features, num_classes)
             other_model.load_state_dict(torch.load(
                 model_path, map_location=self.device))
-
             # Store the selected classes for later filtering during inference
             other_model.selected_classes = selected_classes
-
             return other_model.to(self.device)
-
         else:
             raise NotImplementedError(
                 f"Model type {model_type} is not supported.")
@@ -329,7 +325,6 @@ class CoeusClassification(nn.Module):
             self.load_state_dict(torch.load(self.get_setting(
                 "path_to_trained"), map_location=self.device))
             self.model_loaded = True  # Ensure we don't load it again
-
         image = Image.open(image_path).convert('RGB')
         image = self.transform(image).unsqueeze(0).to(self.device)
 
@@ -345,7 +340,6 @@ class CoeusClassification(nn.Module):
         primary_prediction = self.predict_image(image_path)
         references = {}
         detection_classes = self.load_detection_classes()
-
         image = Image.open(image_path).convert('RGB')
         transformed_image = self.transform(image).unsqueeze(0).to(self.device)
 
