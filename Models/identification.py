@@ -153,12 +153,6 @@ class CoeusIdentification(torch.nn.Module):
         else:
             raise ValueError("Dataset path not provided.")
 
-    def save_trained(self):
-        """ Save the trained Faster R-CNN model and its settings. """
-        trained_path = os.path.join(self.save_dir, "fasterrcnn_trained.pth")
-        torch.save(self.fasterrcnn.state_dict(), trained_path)
-        self.update_settings_file("path_to_trained", trained_path)
-
     def load_trained_model(self):
         """ Load the trained Faster R-CNN model. """
         trained_path = self.get_setting("path_to_trained")
@@ -191,6 +185,7 @@ class CoeusIdentification(torch.nn.Module):
         settings[key] = value
         with open(file_path, 'w') as file:
             json.dump(settings, file, indent=4)
+
 
     def save_trained(self):
         """ Save the trained Faster R-CNN model and its settings. """
