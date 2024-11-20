@@ -10,22 +10,23 @@ import torch.optim as optim
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torch.utils.data import DataLoader, random_split, Dataset
-from torchvision import models, transforms
+from torchvision import transforms
 from torchvision.transforms import functional as F
+import torchvision.transforms as T
 from sklearn.metrics import average_precision_score, precision_recall_curve
-from sklearn.metrics import mean_absolute_error
+from Models.coeus_base import CoeusBase
 
 
-class CoeusIdentification(torch.nn.Module):
-    def __init__(self, title, training=False, dataset_path=None, save_dir=None, class_selection=None):
+class CoeusIdentification(nn.Module, CoeusBase):
+    def __init__(self, title, training=False, dataset_path=None, save_dir=None):
         super(CoeusIdentification, self).__init__()
+        CoeusBase.__init__(self)
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.title = title
         # Use title to organize model-specific settings
         self.save_dir = os.path.join(save_dir, title)
         self.dataset_path = dataset_path
-        self.class_selection = class_selection  # Store class selection
 
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -39,34 +40,26 @@ class CoeusIdentification(torch.nn.Module):
 
             # Modify the classifier head based on selected classes
             self.fasterrcnn.roi_heads.box_predictor = FastRCNNPredictor(
-                in_features, len(self.class_selection) or num_classes)
+                in_features, num_classes)
 
-            # Save class mappings to persistent JSON file
             self.dataset = self.create_dataset()
-            self.class_to_idx = self.filter_classes(self.dataset.class_to_idx)
-            # Check for missing classes in dataset and raise an error if found
-            available_classes = set(self.dataset.class_to_idx.values())
-            missing_classes = set(self.class_selection) - available_classes
-            if missing_classes:
-                raise ValueError(f"Selected classes not found in dataset: {
-                                 missing_classes}")
-
+            self.class_to_idx = self.dataset.class_to_idx
             self.save_class_mappings()
 
         # Move model to device (GPU/CPU)
         self.fasterrcnn.to(self.device)
 
-        # Load other models for classification (optional)
-        self.reference_models = {
-            "car_models_id": self.load_other_model(f"{self.save_dir}/classify/path_to_trained.pth", "resnet50"),
-            # Add more models if necessary...
-        }
+        # Load referenced models
+        referenced_models = self.get_setting("referenced_models") or {}
+        self.create_reference_models(referenced_models)
 
     def save_torchscript_model(self):
         """ Save the TorchScript model for deployment. """
-        trained_path = os.path.join(self.save_dir, "trained_model_scripted.pth")
+        trained_path = os.path.join(
+            self.save_dir, "trained_model_scripted.pth")
         # Convert the Faster R-CNN model to TorchScript
-        scripted_model = torch.jit.script(self.fasterrcnn)  # or torch.jit.trace(self.fasterrcnn) for tracing
+        # or torch.jit.trace(self.fasterrcnn) for tracing
+        scripted_model = torch.jit.script(self.fasterrcnn)
         scripted_model.save(trained_path)
         self.update_settings_file("path_to_scripted", trained_path)
         print(f"TorchScript model saved to {trained_path}")
@@ -105,38 +98,23 @@ class CoeusIdentification(torch.nn.Module):
         else:
             raise FileNotFoundError("Detection class mappings not found!")
 
-    def load_other_model(self, model_path, model_type="resnet50"):
-        """ Load a classification model (e.g., ResNet50, VGG16). """
-        if model_type == "resnet50":
-            model = models.resnet50(pretrained=True)
-        elif model_type == "vgg16":
-            model = models.vgg16(pretrained=True)
-        model.load_state_dict(torch.load(model_path))
-        model.to(self.device).eval()
-        return model
+    # def apply_classification(self, image, model_ref):
+    #     """ Classify car part using the specified classification model. """
+    #     if model_ref in self.reference_models:
+    #         model = self.reference_models[model_ref]
+    #         return self.classify_part(image, model)
+    #     else:
+    #         print(f"Model reference '{model_ref}' not found.")
+    #         return None
 
-    def apply_classification(self, image, model_ref):
-        """ Classify car part using the specified classification model. """
-        if model_ref in self.reference_models:
-            model = self.reference_models[model_ref]
-            return self.classify_part(image, model)
-        else:
-            print(f"Model reference '{model_ref}' not found.")
-            return None
+    # def classify_part(self, image, model):
+    #     """ Classify a part of the car using the classification model. """
+    #     image_tensor = T.to_tensor(image).unsqueeze(0).to(self.device)
+    #     with torch.no_grad():
+    #         output = model(image_tensor)
+    #     probabilities = F.softmax(output, dim=1)
+    #     return torch.argmax(probabilities, dim=1)
 
-    def classify_part(self, image, model):
-        """ Classify a part of the car using the classification model. """
-        image_tensor = T.to_tensor(image).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            output = model(image_tensor)
-        probabilities = F.softmax(output, dim=1)
-        return torch.argmax(probabilities, dim=1)
-
-    def apply_nms(self, predictions, iou_threshold):
-        boxes = predictions['boxes']
-        scores = predictions['scores']
-        keep = nms(boxes, scores, iou_threshold)
-        return [predictions[idx] for idx in keep]
 
     def create_dataset(self):
         """ Create the dataset object. """
@@ -153,31 +131,20 @@ class CoeusIdentification(torch.nn.Module):
         else:
             raise ValueError("Dataset path not provided.")
 
-    def load_trained_model(self):
-        """ Load the trained Faster R-CNN model. """
-        trained_path = self.get_setting("path_to_trained")
-        self.fasterrcnn.load_state_dict(torch.load(
-            trained_path, map_location=self.device))
-        # Ensure model is in eval mode after loading
-        self.fasterrcnn.to(self.device).eval()
-        for model in self.reference_models.values():
-            model.eval()  # Set classification models to eval mode
-        print(f"Model loaded from {trained_path}")
-
     def get_num_classes(self):
         """ Get number of classes for detection model. """
         return len(self.create_dataset().classes) if self.dataset_path else 91
 
     def get_setting(self, key):
         """ Retrieve setting from the settings file. """
-        file_path = os.path.join(self.save_dir, "settings.json")
+        file_path = os.path.join(self.save_dir, "coeus_identify_settings.json")
         with open(file_path, 'r') as file:
             settings = json.load(file)
         return settings.get(key)
 
     def update_settings_file(self, key, value):
         """ Update settings file for model-specific configurations. """
-        file_path = os.path.join(self.save_dir, "settings.json")
+        file_path = os.path.join(self.save_dir, "coeus_identify_settings.json")
         settings = {}
         if os.path.exists(file_path):
             with open(file_path, 'r') as file:
@@ -185,7 +152,6 @@ class CoeusIdentification(torch.nn.Module):
         settings[key] = value
         with open(file_path, 'w') as file:
             json.dump(settings, file, indent=4)
-
 
     def save_trained(self):
         """ Save the trained Faster R-CNN model and its settings. """
@@ -301,92 +267,100 @@ class CoeusIdentification(torch.nn.Module):
         self.fasterrcnn.eval()
         print(f"Model loaded from {trained_path}")
 
-    def predict_image(self, image_path, threshold=0.5, iou_threshold=0.5):
+    def predict_image(self, image_path, selected_classes=None, threshold=0.5, iou_threshold=0.5):
+        """Predict objects in an image and optionally filter by selected classes."""
+        # Load the trained model if not already loaded
         if not hasattr(self, 'model_loaded') or not self.model_loaded:
             self.load_trained_model()
             self.model_loaded = True
 
+        # Ensure class mappings are loaded
+        if not hasattr(self, 'class_to_idx'):
+            self.load_class_mappings()
+
+        # Convert selected class names to indices
+        selected_class_indices = None
+        if selected_classes:
+            selected_class_indices = set(
+                idx for cls, idx in self.class_to_idx.items() if cls in selected_classes
+            )
+
+        # Set the model to evaluation mode
         self.fasterrcnn.eval()
 
+        # Load and preprocess the image
         image = Image.open(image_path).convert('RGB')
         image_tensor = F.to_tensor(image).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
-            raw_prediction = self.fasterrcnn(image_tensor)[0]
+            # Get raw predictions
+            raw_predictions = self.fasterrcnn(image_tensor)[0]
 
-            # Apply Non-Maximum Suppression (NMS) to filter overlapping boxes
-            predictions = self.apply_nms(
-                raw_prediction, iou_threshold=iou_threshold)
+            # Apply NMS
+            filtered_indices = nms(
+                raw_predictions['boxes'], raw_predictions['scores'], iou_threshold
+            )
+            predictions = {key: val[filtered_indices].cpu()
+                           for key, val in raw_predictions.items()}
 
-            # Filter predictions by selected classes
-            filtered_predictions = [
-                pred for pred in predictions if pred['labels'].item() in self.class_selection]
+            # Filter by confidence threshold
+            confidence_mask = predictions['scores'] > threshold
+            predictions = {
+                key: val[confidence_mask] for key, val in predictions.items()
+            }
 
-            # Filter predictions by score threshold
-            for box, label, score, model_ref in zip(filtered_predictions['boxes'], filtered_predictions['labels'], filtered_predictions['scores'], filtered_predictions['model_refs']):
-                if score > threshold:
-                    print(f"Detected: Label={label.item()}, Score={
-                          score:.2f}, Box={box.cpu().numpy()}")
+            # Filter by selected classes, if provided
+            if selected_class_indices is not None:
+                class_mask = torch.tensor(
+                    [label in selected_class_indices for label in predictions['labels']],
+                    dtype=torch.bool
+                )
+                predictions = {
+                    key: val[class_mask] for key, val in predictions.items()
+                }
 
-                    # Check if model_ref is valid
-                    if model_ref in self.reference_models:
-                        referenced_model = self.reference_models[model_ref]
-                        referenced_result = self.apply_classification(
-                            image, referenced_model)
-                        print(f"Classified as: {referenced_result.item()}")
-                    else:
-                        print(f"Model reference '{model_ref}' not found!")
+        # Handle empty predictions
+        if len(predictions['boxes']) == 0:
+            return {"boxes": [], "labels": [], "scores": []}
+
+        # Convert class indices to names
+        idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+        predictions['labels'] = [
+            idx_to_class.get(label.item(), "Unknown") for label in predictions['labels']
+        ]
+
+        return predictions
 
 
 class CustomDataset(Dataset):
-    def __init__(self, root, annotations_file, transform=None, class_selection=None):
+    def __init__(self, root, annotations_file, transform=None):
         self.root = root
         self.annotations = json.load(open(annotations_file))
         self.transform = transform
-        self.class_selection = class_selection  # Store selected classes
-
-        # Validate class selection
-        self.class_selection = set(self.class_selection or [])
-
-        # Filter annotations to keep only the selected classes
-        self.annotations = [
-            ann for ann in self.annotations if any(
-                box['category_id'] in self.class_selection for box in ann['annotations']
-            )
-        ]
-
-        # Ensure all selected classes are part of the dataset
-        available_classes = set(
-            box['category_id'] for ann in self.annotations for box in ann['annotations'])
-        missing_classes = self.class_selection - available_classes
-        if missing_classes:
-            raise ValueError(f"Selected classes not found in dataset: {
-                             missing_classes}")
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.root, self.annotations[idx]['file_name'])
         image = Image.open(img_path).convert("RGB")
         boxes = self.annotations[idx]['annotations']
 
-        # Filter boxes based on class selection
-        boxes = [box['bbox']
-                 for box in boxes if box['category_id'] in self.class_selection]
+        # Extract bounding boxes, labels, and model references
+        boxes = [box['bbox'] for box in boxes]
         labels = [box['category_id'] for box in boxes]
-
-        # Model references for classification
-        model_refs = [box['model_ref']
-                      for box in boxes if box['category_id'] in self.class_selection]
+        model_refs = [box['model_ref'] for box in boxes]
 
         target = {
             'boxes': torch.tensor(boxes, dtype=torch.float32),
             'labels': torch.tensor(labels, dtype=torch.int64),
-            'model_refs': model_refs  # Add model references for classification
+            'model_refs': model_refs
         }
 
         if self.transform:
             image, target = self.transform(image, target)
 
         return image, target
+
+    def __len__(self):
+        return len(self.annotations)
 
 
 class CustomTransform:
