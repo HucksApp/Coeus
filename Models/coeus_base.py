@@ -9,11 +9,22 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn
 from torchvision.models import mobilenet_v2
 from torchvision.transforms.functional import to_tensor
 from PIL import Image
+from abc import abstractmethod
 
 class CoeusBase:
 
     def __init__(self) :
         self.reference_models = {}
+
+    @abstractmethod
+    def predict_image(self, image_path, selected_classes=None, **kwargs):
+        """Method to be implemented in the child class for primary image prediction."""
+        pass
+
+    @abstractmethod
+    def get_setting(self):
+        pass
+
 
     def create_reference_models(self, referenced_models):
         for key, model_props in referenced_models.items():
