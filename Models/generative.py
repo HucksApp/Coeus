@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from torch.utils.data import DataLoader, Dataset
-from PIL import Image
 from torchvision import models
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 import torch.optim as optim
@@ -13,12 +12,13 @@ from torchvision.models import mobilenet_v2
 from PIL import Image
 import os
 import json
+from Models.coeus_base import CoeusBase
 
 
-class CoeusGenerative(nn.Module):
+class CoeusGenerative(nn.Module, CoeusBase):
     def __init__(self, training=False, dataset_path=None, save_dir=None, title=None):
         super(CoeusGenerative, self).__init__()
-
+        CoeusBase.__init__(self)
         # Title-based settings for the model
         self.title = title
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
@@ -44,11 +44,10 @@ class CoeusGenerative(nn.Module):
             self.load_state_dict(torch.load(path_to_trained))
             self.eval()
 
-        # Referenced models for classification or detection
-        self.referenced_models = {}
+        # Referenced models
+        # Load referenced models
         referenced_models = self.get_setting("referenced_models") or {}
-        for key, model_info in referenced_models.items():
-            self.referenced_models[key] = self.load_other_model(model_info)
+        self.create_reference_models(referenced_models)
 
     ### SETTINGS MANAGEMENT ###
     def update_settings_file(self, key, value):
@@ -70,33 +69,11 @@ class CoeusGenerative(nn.Module):
             return data.get(key)
         return None
 
-    ### DATASET CREATION ###
-    class TextDataset(Dataset):
-        def __init__(self, tokenizer, texts, max_length=512):
-            self.tokenizer = tokenizer
-            self.texts = texts
-            self.max_length = max_length
-
-        def __len__(self):
-            return len(self.texts)
-
-        def __getitem__(self, idx):
-            encodings = self.tokenizer(
-                self.texts[idx],
-                truncation=True,
-                padding="max_length",
-                max_length=self.max_length,
-                return_tensors="pt",
-            )
-            input_ids = encodings["input_ids"].squeeze()
-            attention_mask = encodings["attention_mask"].squeeze()
-            return input_ids, attention_mask
-
     def create_text_dataset(self):
         if self.training and self.dataset_path:
             with open(self.dataset_path, "r") as file:
                 texts = json.load(file)
-            return self.TextDataset(self.tokenizer, texts)
+            return TextDataset(self.tokenizer, texts)
 
     ### TRAINING ###
     def train_in_progessive(self, epochs_per_run=3, batch_size=8):
@@ -145,50 +122,6 @@ class CoeusGenerative(nn.Module):
         self.update_settings_file("path_to_trained", trained_path)
         torch.save(self.state_dict(), trained_path)
 
-    ### REFERENCED MODELS ###
-    def load_other_model(self, model_info):
-        model_path = model_info.get("path")
-        model_type = model_info.get("type").lower()
-        model_name = model_info.get("model_name").lower()
-        selected_classes = model_info.get("selected_classes", None)
-        detection_classes = model_info.get("detection_classes", None)
-
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found at {model_path}")
-
-        # Load classification models
-        if model_type == "classification":
-            if model_name == "resnet50":
-                model = models.resnet50(weights=None)
-                num_classes = len(selected_classes) if selected_classes else self.get_setting("num_classes")
-                model.fc = nn.Linear(model.fc.in_features, num_classes)
-                model.load_state_dict(torch.load(model_path, map_location=self.device))
-                model.selected_classes = selected_classes
-            elif model_name == "mobilenetv2":
-                model = mobilenet_v2(weights=None)
-                num_classes = len(selected_classes) if selected_classes else self.get_setting("num_classes")
-                model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-                model.load_state_dict(torch.load(model_path, map_location=self.device))
-                model.selected_classes = selected_classes
-            else:
-                raise ValueError(f"Unsupported classification model name: {model_name}")
-
-        # Load identification models
-        elif model_type == "identification":
-            if model_name == "fasterrcnn":
-                model = fasterrcnn_resnet50_fpn(weights=None)
-                model.load_state_dict(torch.load(model_path, map_location=self.device))
-                model.eval()  # Set to evaluation mode
-                model.detection_classes = detection_classes
-            else:
-                raise ValueError(f"Unsupported identification model name: {model_name}")
-
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}")
-
-        # Move the model to the appropriate device and return it
-        return model.to(self.device)
-
     ### INFERENCE ###
     def generate_answer(self, question, max_length=100):
         self.model.eval()
@@ -199,6 +132,7 @@ class CoeusGenerative(nn.Module):
             )
             answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         return answer
+
 
     def answer_with_references(self, question, input_data=None):
         primary_answer = self.generate_answer(question)
@@ -225,7 +159,27 @@ class CoeusGenerative(nn.Module):
 
         return {"primary_answer": primary_answer, "references": references}
 
+    ### DATASET CREATION ###
+class TextDataset(Dataset):
+    def __init__(self, tokenizer, texts, max_length=512):
+        self.tokenizer = tokenizer
+        self.texts = texts
+        self.max_length = max_length
 
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, idx):
+        encodings = self.tokenizer(
+            self.texts[idx],
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_length,
+            return_tensors="pt",
+        )
+        input_ids = encodings["input_ids"].squeeze()
+        attention_mask = encodings["attention_mask"].squeeze()
+        return input_ids, attention_mask
 
 # usage:
 # coeus = CoeusGenerative(training=True, dataset_path="path/to/texts.json", save_dir="./Models", title="GenerativeModel")

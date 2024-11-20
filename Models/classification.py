@@ -4,12 +4,7 @@ from torchvision import models
 from torchvision import datasets
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
 import torch.optim as optim
-from torchvision.models import mobilenet_v2
-from torchvision.transforms.functional import to_tensor
-from diffusers import StableDiffusionPipeline
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from PIL import Image
 import os
 import json
@@ -32,7 +27,6 @@ class CoeusClassification(nn.Module, CoeusBase):
             "cuda" if torch.cuda.is_available() else "cpu")
         self.resnet = models.resnet50(
             weights=None if training else models.ResNet50_Weights.DEFAULT)
-        self.reference_models = {}  # To store other models
 
         # Transformations
         self.transform = transforms.Compose([
