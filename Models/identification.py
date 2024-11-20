@@ -98,23 +98,6 @@ class CoeusIdentification(nn.Module, CoeusBase):
         else:
             raise FileNotFoundError("Detection class mappings not found!")
 
-    # def apply_classification(self, image, model_ref):
-    #     """ Classify car part using the specified classification model. """
-    #     if model_ref in self.reference_models:
-    #         model = self.reference_models[model_ref]
-    #         return self.classify_part(image, model)
-    #     else:
-    #         print(f"Model reference '{model_ref}' not found.")
-    #         return None
-
-    # def classify_part(self, image, model):
-    #     """ Classify a part of the car using the classification model. """
-    #     image_tensor = T.to_tensor(image).unsqueeze(0).to(self.device)
-    #     with torch.no_grad():
-    #         output = model(image_tensor)
-    #     probabilities = F.softmax(output, dim=1)
-    #     return torch.argmax(probabilities, dim=1)
-
 
     def create_dataset(self):
         """ Create the dataset object. """
