@@ -16,10 +16,11 @@ from Models.model_keys import CoeusModelKeys
 
 
 class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
-    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=[] ):
+    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=[]):
         super(CoeusGenerative, self).__init__()
         CoeusBase.__init__(self)
-        CoeusModelKeys.__init__(self, self.get_setting, self.update_settings_file, training, keys)
+        CoeusModelKeys.__init__(self, self.get_setting,
+                                self.update_settings_file, training, keys)
         # Title-based settings for the model
         self.title = title
         self.keys = keys
@@ -30,7 +31,8 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         # Device setup
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
 
         # GPT-4-like model setup (using GPT-2 as a base)
         self.training = training
@@ -52,10 +54,11 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
         referenced_models = self.get_setting("referenced_models") or {}
         self.create_reference_models(referenced_models)
 
-        
     ### SETTINGS MANAGEMENT ###
+
     def update_settings_file(self, key, value):
-        file_path = os.path.join(self.save_dir, "coeus_generative_settings.json")
+        file_path = os.path.join(
+            self.save_dir, "coeus_generative_settings.json")
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 data = json.load(file)
@@ -66,7 +69,8 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
             json.dump(data, file, indent=4)
 
     def get_setting(self, key):
-        file_path = os.path.join(self.save_dir, "coeus_generative_settings.json")
+        file_path = os.path.join(
+            self.save_dir, "coeus_generative_settings.json")
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 data = json.load(file)
@@ -83,7 +87,8 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
     def train_in_progessive(self, epochs_per_run=3, batch_size=8):
         dataset = self.create_text_dataset()
         train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        checkpoint_path = os.path.join(self.save_dir, "progress_checkpoint.pth")
+        checkpoint_path = os.path.join(
+            self.save_dir, "progress_checkpoint.pth")
         start_epoch = 0
 
         if os.path.exists(checkpoint_path):
@@ -98,10 +103,12 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
             self.train()
             total_loss = 0
             for input_ids, attention_mask in train_loader:
-                input_ids, attention_mask = input_ids.to(self.device), attention_mask.to(self.device)
+                input_ids, attention_mask = input_ids.to(
+                    self.device), attention_mask.to(self.device)
 
                 self.optimizer.zero_grad()
-                outputs = self.model(input_ids, attention_mask=attention_mask, labels=input_ids)
+                outputs = self.model(
+                    input_ids, attention_mask=attention_mask, labels=input_ids)
                 loss = outputs.loss
                 loss.backward()
                 self.optimizer.step()
@@ -129,11 +136,13 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
     def generate_answer(self, question, max_length=100):
         self.model.eval()
         with torch.no_grad():
-            input_ids = self.tokenizer.encode(question, return_tensors="pt").to(self.device)
+            input_ids = self.tokenizer.encode(
+                question, return_tensors="pt").to(self.device)
             output_ids = self.model.generate(
                 input_ids, max_length=max_length, pad_token_id=self.tokenizer.eos_token_id
             )
-            answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+            answer = self.tokenizer.decode(
+                output_ids[0], skip_special_tokens=True)
         return answer
 
     def generate_common_qxa(self, key_obj):
@@ -141,7 +150,7 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
         file_path = os.path.join(self.save_dir, "common_question.json")
         if not os.path.exists(file_path):
             return f"No common questions file found at: {file_path}"
-        
+
         with open(file_path, "r") as file:
             common_questions = json.load(file)
         # Check if the detected part exists in the loaded questions
@@ -156,16 +165,15 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
             questions_and_answers[category] = []
             for question in questions:
                 answer = self.generate_answer(question)
-                questions_and_answers[category].append({"question": question, "answer": answer})
+                questions_and_answers[category].append(
+                    {"question": question, "answer": answer})
         return questions_and_answers
-    
+
     def generate_reference_answer(self, question, key_obj):
         pass
+
     def generate_image_reference(self, question, key_obj):
         pass
-
-
-
 
     # def answer_cm_qa_detectected(self, question, detected=None ):
     #     primary_answer = self.generate_answer(question)
@@ -175,7 +183,7 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
     #     if detected:
     #         references["qa"] = self.generate_questions_and_answers(detected)
     #     return {"primary_answer": primary_answer, "references": references}
-    
+
     # def generate_reference_answer(self, question, input_data=None):
     #     primary_answer = self.generate_answer(question)
     #     references = {}
@@ -201,8 +209,9 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
 
     #     return {"primary_answer": primary_answer, "references": references}
 
-
     ### DATASET CREATION ###
+
+
 class TextDataset(Dataset):
     def __init__(self, tokenizer, texts, max_length=512):
         self.tokenizer = tokenizer

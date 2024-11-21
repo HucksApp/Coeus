@@ -8,12 +8,14 @@ from torch.utils.data import DataLoader
 from Models.model_keys import CoeusModelKeys
 from Models.coeus_base import CoeusBase
 
+
 class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
     def __init__(self, model_name="stable-diffusion", save_dir=None, title=None, training=False, keys=[], scheduler_name="DDIM"):
         # Initialize model settings
 
         CoeusBase.__init__(self)
-        CoeusModelKeys.__init__(self, self.get_setting, self.update_settings_file, training, keys)
+        CoeusModelKeys.__init__(self, self.get_setting,
+                                self.update_settings_file, training, keys)
         self.title = title
         self.save_dir = os.path.join(self.save_dir, "image_generative")
         os.makedirs(self.save_dir, exist_ok=True)
@@ -21,9 +23,9 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
-
         # Device configuration
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
 
         # Model loading
         self.model_name = model_name
@@ -31,18 +33,20 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         self.controlnet = None
         self.training = training
         self.scheduler_name = scheduler_name
-        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            "openai/clip-vit-base-patch32")
         if training:
             self.load_pipeline(training=True)
-            self.optimizer = torch.optim.AdamW(self.pipeline.unet.parameters(), lr=5e-6)
-            self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.1)
+            self.optimizer = torch.optim.AdamW(
+                self.pipeline.unet.parameters(), lr=5e-6)
+            self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optimizer, step_size=100, gamma=0.1)
         else:
             # Load pretrained model for inference
             self.load_pipeline()
-            
-
 
     ### SETTINGS MANAGEMENT ###
+
     def _settings_file_path(self):
         return os.path.join(self.save_dir, "coeus_generate_settings.json")
 
@@ -83,8 +87,8 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         self.keys = updated_keys
         self.update_settings_file("keys", updated_keys)
 
-
     ### MODEL LOADING ###
+
     def load_pipeline(self, training=False):
         try:
             if self.model_name == "stable-diffusion":
@@ -105,27 +109,30 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         except Exception as e:
             raise RuntimeError(f"Error loading the pipeline: {e}")
 
-
     ### TRAINING ###
+
     def train_in_progressive(self, dataset, epochs=1, save_checkpoints=True):
         """
         Fine-tune the pipeline on a custom dataset (text-image pairs).
         Dataset should be a PyTorch DataLoader.
         """
         self.pipeline.train()
-        data_loader = DataLoader(dataset, batch_size=8, shuffle=True)  # Adjust batch size as needed
+        # Adjust batch size as needed
+        data_loader = DataLoader(dataset, batch_size=8, shuffle=True)
 
         for epoch in range(epochs):
             for batch_idx, (texts, images) in enumerate(data_loader):
                 try:
                     images = images.to(self.device)
-                    latents = self.pipeline.vae.encode(images).latent_dist.sample()
+                    latents = self.pipeline.vae.encode(
+                        images).latent_dist.sample()
                     text_inputs = self.tokenizer(
                         texts, padding="max_length", truncation=True, return_tensors="pt"
                     ).input_ids.to(self.device)
                     noise = torch.randn_like(latents)
                     latents_noisy = latents + noise
-                    predicted_noise = self.pipeline.unet(latents_noisy, text_inputs).sample
+                    predicted_noise = self.pipeline.unet(
+                        latents_noisy, text_inputs).sample
                     loss = torch.nn.functional.mse_loss(predicted_noise, noise)
 
                     loss.backward()
@@ -143,7 +150,8 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
                 print(f"Epoch {epoch + 1}/{epochs}, Loss: {loss.item()}")
 
     def save_checkpoint(self, epoch):
-        checkpoint_path = os.path.join(self.save_dir, f"checkpoint_epoch_{epoch}.pth")
+        checkpoint_path = os.path.join(
+            self.save_dir, f"checkpoint_epoch_{epoch}.pth")
         torch.save({
             "model_state_dict": self.pipeline.unet.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
@@ -166,7 +174,8 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
 
     def generate_with_controlnet(self, prompt, canny_image, guidance_scale=7.5, num_inference_steps=50):
         if not self.controlnet:
-            raise ValueError("ControlNet is not loaded. Use a ControlNet model.")
+            raise ValueError(
+                "ControlNet is not loaded. Use a ControlNet model.")
         self.pipeline.eval()
         with torch.no_grad():
             images = self.pipeline(
@@ -184,7 +193,8 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         print(f"Image saved to {save_path}")
 
     def save_torchscript_model(self):
-        scripted_path = os.path.join(self.save_dir, "trained_model_scripted.pth")
+        scripted_path = os.path.join(
+            self.save_dir, "trained_model_scripted.pth")
         scripted_model = torch.jit.script(self.pipeline.unet)
         scripted_model.save(scripted_path)
         self.update_settings_file("path_to_scripted", scripted_path)
@@ -195,4 +205,5 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
             self.pipeline.unet = torch.jit.load(scripted_path)
             self.pipeline.unet.to(self.device)
         else:
-            print(f"Scripted model not found at {scripted_path}. Make sure the path is correct.")
+            print(f"Scripted model not found at {
+                  scripted_path}. Make sure the path is correct.")

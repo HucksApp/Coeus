@@ -101,7 +101,6 @@ class CoeusIdentification(nn.Module, CoeusBase):
         else:
             raise FileNotFoundError("Detection class mappings not found!")
 
-
     def create_dataset(self):
         """ Create the dataset object. """
         if self.dataset_path:

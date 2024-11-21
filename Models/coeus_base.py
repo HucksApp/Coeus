@@ -11,9 +11,10 @@ from torchvision.transforms.functional import to_tensor
 from PIL import Image
 from abc import abstractmethod
 
+
 class CoeusBase:
 
-    def __init__(self) :
+    def __init__(self):
         self.reference_models = {}
 
     @abstractmethod
@@ -31,12 +32,10 @@ class CoeusBase:
         """implement in child class"""
         pass
 
-
     def create_reference_models(self, referenced_models):
         for key, model_props in referenced_models.items():
             self.reference_models[key] = self.__load_other_model__(
                 model_props['path'], model_props['model_type'] or "resnet50", model_props['selected_classes'], model_props['detection_classes'])
-
 
     def __load_other_model__(self, model_options, model_type, selected_classes=None, detection_classes=None):
         if model_type.lower() == "resnet50":
@@ -101,7 +100,7 @@ class CoeusBase:
         else:
             raise NotImplementedError(
                 f"Model type {model_type} is not supported.")
-        
+
     def manage_referenced_model(self, key, model_options=None, model_type=None, rm=False, detection_classes=None, selected_classes=None):
         # Load current referenced models from settings
         referenced_models = self.get_setting("referenced_models") or {}
@@ -112,7 +111,8 @@ class CoeusBase:
                 del self.reference_models[key]  # Remove from in-memory models
             if key in referenced_models:
                 del referenced_models[key]  # Remove from saved settings
-                self.update_settings_file("referenced_models", referenced_models)
+                self.update_settings_file(
+                    "referenced_models", referenced_models)
                 print(f"Removed referenced model: {key}")
             else:
                 print(f"Referenced model '{key}' does not exist.")
@@ -133,9 +133,9 @@ class CoeusBase:
         self.update_settings_file("referenced_models", referenced_models)
         print(f"Added or updated referenced model: {key}")
 
-
     def predict_image_with_references(self, image_path, selected_classes=None, **kwargs):
-        primary_prediction = self.predict_image(image_path, selected_classes, **kwargs)
+        primary_prediction = self.predict_image(
+            image_path, selected_classes, **kwargs)
         references = {}
         image = Image.open(image_path).convert('RGB')
         transformed_image = self.transform(image).unsqueeze(0).to(self.device)
@@ -173,7 +173,8 @@ class CoeusBase:
 
             elif model_type == "gpt-4-like":
                 with torch.no_grad():
-                    prompt = f"Analyze the given image: {image_path} and provide insights." # to passed 
+                    prompt = f"Analyze the given image: {
+                        image_path} and provide insights."  # to passed
                     inputs = model.tokenizer(
                         prompt, return_tensors="pt").to(self.device)
                     output = model.generate(
@@ -184,7 +185,8 @@ class CoeusBase:
             elif model_type == "stable-diffusion":
                 with torch.no_grad():
                     # Generating an image or variation based on the input image
-                    sd_prompt = f"Create a detailed artistic rendition of {image_path}." # to passed 
+                    sd_prompt = f"Create a detailed artistic rendition of {
+                        image_path}."  # to passed
                     generated_images = model(
                         prompt=sd_prompt, num_inference_steps=50, guidance_scale=7.5).images
                     # Assuming you need the first image

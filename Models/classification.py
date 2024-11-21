@@ -21,7 +21,6 @@ class CoeusClassification(nn.Module, CoeusBase):
         self.save_dir = os.path.join(self.save_dir, "classify")
         os.makedirs(self.save_dir, exist_ok=True)
 
-
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -233,7 +232,8 @@ class CoeusClassification(nn.Module, CoeusBase):
     def predict_image(self, image_path, selected_classes=None):
         # Load the trained model if not already loaded
         if not hasattr(self, 'model_loaded') or not self.model_loaded:
-            self.load_state_dict(torch.load(self.get_setting("path_to_trained"), map_location=self.device))
+            self.load_state_dict(torch.load(self.get_setting(
+                "path_to_trained"), map_location=self.device))
             self.model_loaded = True  # Ensure we don't load it again
 
         # Preprocess the image
@@ -246,7 +246,8 @@ class CoeusClassification(nn.Module, CoeusBase):
             _, predicted = torch.max(output, 1)
 
         # Convert the predicted index to class name
-        idx_to_class = {v: k for k, v in self.get_setting("class_to_idx").items()}
+        idx_to_class = {v: k for k, v in self.get_setting(
+            "class_to_idx").items()}
         predicted_class = idx_to_class[predicted.item()]
 
         # Filter by selected classes if provided
@@ -254,6 +255,3 @@ class CoeusClassification(nn.Module, CoeusBase):
             return None  # Return None if the predicted class is not in selected classes
 
         return predicted_class
-
-
-
