@@ -10,17 +10,18 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn
 import torch.optim as optim
 from PIL import Image
 import os
+import re
 import json
 from Models.coeus_base import CoeusBase
 
 
 class CoeusGenerative(nn.Module, CoeusBase):
-    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, key=None ):
+    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=None ):
         super(CoeusGenerative, self).__init__()
         CoeusBase.__init__(self)
         # Title-based settings for the model
         self.title = title
-        self.key = key
+        self.keys = keys
 
         self.save_dir = os.path.join(self.save_dir, "generate")
         os.makedirs(self.save_dir, exist_ok=True)
@@ -41,13 +42,20 @@ class CoeusGenerative(nn.Module, CoeusBase):
             self.optimizer = optim.Adam(self.parameters(), lr=5e-5)
             self.criterion = nn.CrossEntropyLoss()
         else:
-            # check for model traning root
-            model_key = self.get_setting("model_key")
-            if self.key != model_key:
-                raise ValueError(
-                    f"Key mismatch: This model is optimized for '{model_key}' related questions, but the provided key is '{self.key}'."
-                )
-            
+            model_key = self.get_setting("model_key") or []
+    
+            # Split model_key into a set of unique words
+            delimiters = [",", " ", ":", "|"]
+            model_keys = set(self._split_and_clean(model_key, delimiters))
+            input_keys = set(self._split_and_clean(self.key, delimiters))
+            if not input_keys.intersection(model_keys):
+                # Calculate overlap percentage
+                overlap = len(input_keys.intersection(model_keys)) / len(input_keys)
+                if overlap < 0.7:  # Less than 70% match
+                    raise ValueError(
+                        f"Key mismatch: This model is optimized for '{', '.join(model_keys)}' "
+                        f"related questions, but the provided key is '{self.key}'."
+                    )
             # Load settings for inference
             path_to_trained = self.get_setting("path_to_trained")
             self.load_state_dict(torch.load(path_to_trained))
@@ -56,6 +64,12 @@ class CoeusGenerative(nn.Module, CoeusBase):
         # Load referenced models
         referenced_models = self.get_setting("referenced_models") or {}
         self.create_reference_models(referenced_models)
+
+    def _split_and_clean(self, text, delimiters):
+        pattern = f"[{''.join(re.escape(d) for d in delimiters)}]"
+        return {word.strip().lower() for word in re.split(pattern, text) if word.strip()}
+    
+
 
     ### SETTINGS MANAGEMENT ###
     def update_settings_file(self, key, value):
