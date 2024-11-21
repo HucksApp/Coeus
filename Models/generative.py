@@ -10,13 +10,12 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn
 import torch.optim as optim
 from PIL import Image
 import os
-import re
 import json
 from Models.coeus_base import CoeusBase
 
 
 class CoeusGenerative(nn.Module, CoeusBase):
-    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=None ):
+    def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=[] ):
         super(CoeusGenerative, self).__init__()
         CoeusBase.__init__(self)
         # Title-based settings for the model
@@ -42,20 +41,6 @@ class CoeusGenerative(nn.Module, CoeusBase):
             self.optimizer = optim.Adam(self.parameters(), lr=5e-5)
             self.criterion = nn.CrossEntropyLoss()
         else:
-            model_key = self.get_setting("model_key") or []
-    
-            # Split model_key into a set of unique words
-            delimiters = [",", " ", ":", "|"]
-            model_keys = set(self._split_and_clean(model_key, delimiters))
-            input_keys = set(self._split_and_clean(self.key, delimiters))
-            if not input_keys.intersection(model_keys):
-                # Calculate overlap percentage
-                overlap = len(input_keys.intersection(model_keys)) / len(input_keys)
-                if overlap < 0.7:  # Less than 70% match
-                    raise ValueError(
-                        f"Key mismatch: This model is optimized for '{', '.join(model_keys)}' "
-                        f"related questions, but the provided key is '{self.key}'."
-                    )
             # Load settings for inference
             path_to_trained = self.get_setting("path_to_trained")
             self.load_state_dict(torch.load(path_to_trained))
@@ -65,12 +50,7 @@ class CoeusGenerative(nn.Module, CoeusBase):
         referenced_models = self.get_setting("referenced_models") or {}
         self.create_reference_models(referenced_models)
 
-    def _split_and_clean(self, text, delimiters):
-        pattern = f"[{''.join(re.escape(d) for d in delimiters)}]"
-        return {word.strip().lower() for word in re.split(pattern, text) if word.strip()}
-    
-
-
+        
     ### SETTINGS MANAGEMENT ###
     def update_settings_file(self, key, value):
         file_path = os.path.join(self.save_dir, "coeus_generative_settings.json")

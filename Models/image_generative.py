@@ -5,10 +5,15 @@ from diffusers import StableDiffusionPipeline, StableDiffusionControlNetPipeline
 from transformers import CLIPTokenizer
 from PIL import Image
 from torch.utils.data import DataLoader
+from Models.Keys import CoeusModelKeys
+from Models.coeus_base import CoeusBase
 
-class CoeusImageGenerative:
+class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
     def __init__(self, model_name="stable-diffusion", save_dir=None, title=None, training=False, keys=[], scheduler_name="DDIM"):
         # Initialize model settings
+
+        CoeusBase.__init__(self)
+        CoeusModelKeys.__init__(self, training, keys)
         self.title = title
         self.save_dir = os.path.join(self.save_dir, "image_generative")
         os.makedirs(self.save_dir, exist_ok=True)
@@ -27,32 +32,14 @@ class CoeusImageGenerative:
         self.training = training
         self.scheduler_name = scheduler_name
         self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-
         if training:
-            # Load the model in training mode
             self.load_pipeline(training=True)
             self.optimizer = torch.optim.AdamW(self.pipeline.unet.parameters(), lr=5e-6)
             self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.1)
         else:
             # Load pretrained model for inference
             self.load_pipeline()
-
-        model_keys = self.get_setting("keys") or []
-        if  len(model_keys)==0 and not training:
-            raise ValueError(
-                "missing metas: 'keys'  are required to index model optimized object"
-            )
-        elif  training and len(model_keys)==0  and len(keys)==0:
-            raise ValueError(
-                "missing metas: 'keys'  are required to index model optimized object"
-            )
-        self.keys = list(set([*model_keys, *keys]))
-        if len(keys) > 0 :
-            self.update_settings_file('keys', self.keys)
-
-
-
-        
+            
 
 
     ### SETTINGS MANAGEMENT ###
