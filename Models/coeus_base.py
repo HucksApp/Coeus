@@ -18,11 +18,17 @@ class CoeusBase:
 
     @abstractmethod
     def predict_image(self, image_path, selected_classes=None, **kwargs):
-        """Method to be implemented in the child class for primary image prediction."""
+        """implement in child class"""
         pass
 
     @abstractmethod
-    def get_setting(self):
+    def get_setting(self, key):
+        """implement in child class"""
+        pass
+
+    @abstractmethod
+    def update_settings_file(self, key, value):
+        """implement in child class"""
         pass
 
 
