@@ -173,7 +173,7 @@ class CoeusBase:
 
             elif model_type == "gpt-4-like":
                 with torch.no_grad():
-                    prompt = f"Analyze the given image: {image_path} and provide insights."
+                    prompt = f"Analyze the given image: {image_path} and provide insights." # to passed 
                     inputs = model.tokenizer(
                         prompt, return_tensors="pt").to(self.device)
                     output = model.generate(
@@ -184,7 +184,7 @@ class CoeusBase:
             elif model_type == "stable-diffusion":
                 with torch.no_grad():
                     # Generating an image or variation based on the input image
-                    sd_prompt = f"Create a detailed artistic rendition of {image_path}."
+                    sd_prompt = f"Create a detailed artistic rendition of {image_path}." # to passed 
                     generated_images = model(
                         prompt=sd_prompt, num_inference_steps=50, guidance_scale=7.5).images
                     # Assuming you need the first image
