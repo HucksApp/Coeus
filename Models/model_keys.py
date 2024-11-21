@@ -1,9 +1,13 @@
 from abc import abstractmethod
+import os
+import json
 
 
 class CoeusModelKeys:
-    def __init__(self, get_setting, update_settings_file, training=False, keys=[]):
-        model_keys = get_setting("keys") or []
+    def __init__(self, save_dir, settings_file, training=False, keys=[]):
+        model_keys = self.get_setting("keys") or []
+        self.save_dir = save_dir
+        self.settings_file = settings_file
         if training:
             if len(model_keys) == 0 and len(keys) == 0:
                 raise ValueError(
@@ -18,7 +22,28 @@ class CoeusModelKeys:
         self.keys = list(set([*model_keys, *keys]))
         self._validate_keys(model_keys)
         if len(keys) > 0:
-            update_settings_file('keys', self.keys)
+            self.update_settings_file('keys', self.keys)
+
+    def update_settings_file(self, key, value):
+        file_path = os.path.join(
+            self.save_dir, self.settings_file)
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                data = json.load(file)
+        else:
+            data = {}
+        data[key] = value
+        with open(file_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+    def get_setting(self, key):
+        file_path = os.path.join(
+            self.save_dir, self.settings_file)
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                data = json.load(file)
+            return data.get(key)
+        return None
 
     def _validate_keys(self, model_keys):
         if self.keys and model_keys:

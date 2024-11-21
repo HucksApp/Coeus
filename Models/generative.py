@@ -19,17 +19,15 @@ class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
     def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=[]):
         super(CoeusGenerative, self).__init__()
         CoeusBase.__init__(self)
-        CoeusModelKeys.__init__(self, self.get_setting,
-                                self.update_settings_file, training, keys)
         # Title-based settings for the model
         self.title = title
-        self.keys = keys
-
         self.save_dir = os.path.join(self.save_dir, "generate")
         os.makedirs(self.save_dir, exist_ok=True)
 
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
+        CoeusModelKeys.__init__(
+            self, self.save_dir, "coeus_generative_settings.json", training, keys)
         # Device setup
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")

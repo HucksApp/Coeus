@@ -14,8 +14,6 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         # Initialize model settings
 
         CoeusBase.__init__(self)
-        CoeusModelKeys.__init__(self, self.get_setting,
-                                self.update_settings_file, training, keys)
         self.title = title
         self.save_dir = os.path.join(self.save_dir, "image_generative")
         os.makedirs(self.save_dir, exist_ok=True)
@@ -23,6 +21,8 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
+        CoeusModelKeys.__init__(self, self.save_dir,
+                                "coeus_generate_settings.json", training, keys)
         # Device configuration
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
