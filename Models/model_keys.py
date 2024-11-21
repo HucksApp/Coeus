@@ -1,8 +1,8 @@
 from abc import abstractmethod
 
 class CoeusModelKeys:
-    def __init__(self, training=False, keys=[]):
-        model_keys = self.get_setting("keys") or []
+    def __init__(self,get_setting, update_settings_file, training=False, keys=[]):
+        model_keys = get_setting("keys") or []
         if training:
             if len(model_keys) == 0 and len(keys) == 0:
                 raise ValueError(
@@ -17,18 +17,7 @@ class CoeusModelKeys:
         self.keys = list(set([*model_keys, *keys]))
         self._validate_keys(model_keys)
         if len(keys) > 0:
-            self.update_settings_file('keys', self.keys)
-
-
-    @abstractmethod
-    def update_settings_file(self):
-        pass
-        
-    
-    @abstractmethod
-    def get_settings():
-        pass
-
+            update_settings_file('keys', self.keys)
 
     def _validate_keys(self, model_keys):
         if self.keys and model_keys:

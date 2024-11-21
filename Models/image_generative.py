@@ -5,7 +5,7 @@ from diffusers import StableDiffusionPipeline, StableDiffusionControlNetPipeline
 from transformers import CLIPTokenizer
 from PIL import Image
 from torch.utils.data import DataLoader
-from Models.Keys import CoeusModelKeys
+from Models.model_keys import CoeusModelKeys
 from Models.coeus_base import CoeusBase
 
 class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
@@ -13,7 +13,7 @@ class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
         # Initialize model settings
 
         CoeusBase.__init__(self)
-        CoeusModelKeys.__init__(self, training, keys)
+        CoeusModelKeys.__init__(self, self.get_setting, self.update_settings_file, training, keys)
         self.title = title
         self.save_dir = os.path.join(self.save_dir, "image_generative")
         os.makedirs(self.save_dir, exist_ok=True)

@@ -12,12 +12,14 @@ from PIL import Image
 import os
 import json
 from Models.coeus_base import CoeusBase
+from Models.model_keys import CoeusModelKeys
 
 
-class CoeusGenerative(nn.Module, CoeusBase):
+class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):
     def __init__(self, training=False, dataset_path=None, save_dir=None, title=None, keys=[] ):
         super(CoeusGenerative, self).__init__()
         CoeusBase.__init__(self)
+        CoeusModelKeys.__init__(self, self.get_setting, self.update_settings_file, training, keys)
         # Title-based settings for the model
         self.title = title
         self.keys = keys
