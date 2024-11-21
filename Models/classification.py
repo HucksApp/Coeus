@@ -17,6 +17,11 @@ class CoeusClassification(nn.Module, CoeusBase):
         CoeusBase.__init__(self)
         # Title-based settings for the model
         self.title = title
+
+        self.save_dir = os.path.join(self.save_dir, "classify")
+        os.makedirs(self.save_dir, exist_ok=True)
+
+
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 

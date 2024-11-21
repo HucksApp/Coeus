@@ -10,8 +10,12 @@ class CoeusImageGenerative:
     def __init__(self, model_name="stable-diffusion", save_dir=None, title=None, training=False, keys=[], scheduler_name="DDIM"):
         # Initialize model settings
         self.title = title
+        self.save_dir = os.path.join(self.save_dir, "image_generative")
+        os.makedirs(self.save_dir, exist_ok=True)
+
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
+
 
         # Device configuration
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,11 +42,13 @@ class CoeusImageGenerative:
             raise ValueError(
                 "missing metas: 'keys'  are required to index model optimized object"
             )
-        elif  training and len(model_keys)==0  and not keys:
+        elif  training and len(model_keys)==0  and len(keys)==0:
             raise ValueError(
                 "missing metas: 'keys'  are required to index model optimized object"
             )
-        self.keys = [*model_keys, *keys]
+        self.keys = list(set([*model_keys, *keys]))
+        if len(keys) > 0 :
+            self.update_settings_file('keys', self.keys)
 
 
 

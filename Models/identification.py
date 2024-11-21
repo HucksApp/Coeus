@@ -24,10 +24,13 @@ class CoeusIdentification(nn.Module, CoeusBase):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.title = title
+
+        self.save_dir = os.path.join(self.save_dir, "identify")
+        os.makedirs(self.save_dir, exist_ok=True)
+
         # Use title to organize model-specific settings
         self.save_dir = os.path.join(save_dir, title)
         self.dataset_path = dataset_path
-
         os.makedirs(self.save_dir, exist_ok=True)
 
         # Load pre-trained Faster R-CNN with ResNet50 backbone

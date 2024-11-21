@@ -21,6 +21,10 @@ class CoeusGenerative(nn.Module, CoeusBase):
         # Title-based settings for the model
         self.title = title
         self.key = key
+
+        self.save_dir = os.path.join(self.save_dir, "generate")
+        os.makedirs(self.save_dir, exist_ok=True)
+
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         # Device setup
@@ -37,7 +41,7 @@ class CoeusGenerative(nn.Module, CoeusBase):
             self.optimizer = optim.Adam(self.parameters(), lr=5e-5)
             self.criterion = nn.CrossEntropyLoss()
         else:
-            
+            # check for model traning root
             model_key = self.get_setting("model_key")
             if self.key != model_key:
                 raise ValueError(
@@ -144,7 +148,6 @@ class CoeusGenerative(nn.Module, CoeusBase):
         
         with open(file_path, "r") as file:
             common_questions = json.load(file)
-
         # Check if the detected part exists in the loaded questions
         if key_obj not in common_questions:
             return f"No questions available for part: {key_obj}"
