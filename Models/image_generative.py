@@ -6,7 +6,7 @@ from transformers import CLIPTokenizer
 from PIL import Image
 from torch.utils.data import DataLoader
 from Models.model_keys import CoeusModelKeys
-from Models.coeus_base import CoeusBase
+from Models.base import CoeusBase
 
 
 class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
