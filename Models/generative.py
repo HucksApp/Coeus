@@ -11,8 +11,8 @@ import torch.optim as optim
 from PIL import Image
 import os
 import json
-from Models.base import CoeusBase
-from Models.model_keys import CoeusModelKeys
+from Models.utils.base import CoeusBase
+from Models.utils.model_keys import CoeusModelKeys
 
 
 class CoeusGenerative(nn.Module, CoeusBase, CoeusModelKeys):

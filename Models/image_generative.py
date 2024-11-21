@@ -5,8 +5,8 @@ from diffusers import StableDiffusionPipeline, StableDiffusionControlNetPipeline
 from transformers import CLIPTokenizer
 from PIL import Image
 from torch.utils.data import DataLoader
-from Models.model_keys import CoeusModelKeys
-from Models.base import CoeusBase
+from Models.utils.model_keys import CoeusModelKeys
+from Models.utils.base import CoeusBase
 
 
 class CoeusImageGenerative(CoeusBase, CoeusModelKeys):
