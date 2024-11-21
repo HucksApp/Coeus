@@ -28,11 +28,11 @@ class CoeusBase:
 
     def create_reference_models(self, referenced_models):
         for key, model_props in referenced_models.items():
-            self.reference_models[key] = self.__load_other_model(
+            self.reference_models[key] = self.__load_other_model__(
                 model_props['path'], model_props['model_type'] or "resnet50", model_props['selected_classes'], model_props['detection_classes'])
 
 
-    def __load_other_model(self, model_options, model_type, selected_classes=None, detection_classes=None):
+    def __load_other_model__(self, model_options, model_type, selected_classes=None, detection_classes=None):
         if model_type.lower() == "resnet50":
             # Classification model
             other_model = models.resnet50(weights=None)
@@ -96,15 +96,36 @@ class CoeusBase:
             raise NotImplementedError(
                 f"Model type {model_type} is not supported.")
         
-    def add_referenced_model(self, key, model_options, model_type, detection_classes=None, selected_classes=None):
+    def manage_referenced_model(self, key, model_options=None, model_type=None, rm=False, detection_classes=None, selected_classes=None):
+        # Load current referenced models from settings
+        referenced_models = self.get_setting("referenced_models") or {}
+
+        if rm:
+            # Remove the specified model if it exists
+            if key in self.reference_models:
+                del self.reference_models[key]  # Remove from in-memory models
+            if key in referenced_models:
+                del referenced_models[key]  # Remove from saved settings
+                self.update_settings_file("referenced_models", referenced_models)
+                print(f"Removed referenced model: {key}")
+            else:
+                print(f"Referenced model '{key}' does not exist.")
+            return
+
+        # Add or update a referenced model
         self.reference_models[key] = self.load_other_model(
-            model_options, model_type, selected_classes, detection_classes)
+            model_options, model_type, selected_classes, detection_classes
+        )
 
         # Update settings to include the new model reference
-        referenced_models = self.get_setting("referenced_models") or {}
-        referenced_models[key] = {"path": model_options, "model_type": model_type,
-                                  "detection_classes": detection_classes, "selected_classes": selected_classes}
+        referenced_models[key] = {
+            "path": model_options,
+            "model_type": model_type,
+            "detection_classes": detection_classes,
+            "selected_classes": selected_classes,
+        }
         self.update_settings_file("referenced_models", referenced_models)
+        print(f"Added or updated referenced model: {key}")
 
 
     def predict_image_with_references(self, image_path, selected_classes=None, **kwargs):

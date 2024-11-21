@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 class CoeusImageGenerative:
-    def __init__(self, model_name="stable-diffusion", save_dir=None, title=None, training=False, scheduler_name="DDIM"):
+    def __init__(self, model_name="stable-diffusion", save_dir=None, title=None, training=False, keys=[], scheduler_name="DDIM"):
         # Initialize model settings
         self.title = title
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
@@ -33,6 +33,22 @@ class CoeusImageGenerative:
             # Load pretrained model for inference
             self.load_pipeline()
 
+        model_keys = self.get_setting("keys") or []
+        if  len(model_keys)==0 and not training:
+            raise ValueError(
+                "missing metas: 'keys'  are required to index model optimized object"
+            )
+        elif  training and len(model_keys)==0  and not keys:
+            raise ValueError(
+                "missing metas: 'keys'  are required to index model optimized object"
+            )
+        self.keys = [*model_keys, *keys]
+
+
+
+        
+
+
     ### SETTINGS MANAGEMENT ###
     def _settings_file_path(self):
         return os.path.join(self.save_dir, "coeus_generate_settings.json")
@@ -56,6 +72,25 @@ class CoeusImageGenerative:
             return data.get(key)
         return None
 
+    def manage_keys(self, new_keys=None, rm=False):
+        if not new_keys:
+            raise ValueError("Please provide a list of keys to add or remove.")
+
+        # Load current keys from the settings file
+        current_keys = self.get_setting("keys") or []
+
+        if rm:
+            # Remove the specified keys
+            updated_keys = [key for key in current_keys if key not in new_keys]
+        else:
+            # Add the specified keys, avoiding duplicates
+            updated_keys = list(set(current_keys + new_keys))
+
+        # Update the object's keys and the settings file
+        self.keys = updated_keys
+        self.update_settings_file("keys", updated_keys)
+
+
     ### MODEL LOADING ###
     def load_pipeline(self, training=False):
         try:
@@ -76,6 +111,7 @@ class CoeusImageGenerative:
                 raise ValueError(f"Unsupported model: {self.model_name}")
         except Exception as e:
             raise RuntimeError(f"Error loading the pipeline: {e}")
+
 
     ### TRAINING ###
     def train_in_progressive(self, dataset, epochs=1, save_checkpoints=True):
