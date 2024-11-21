@@ -37,13 +37,14 @@ class CoeusGenerative(nn.Module, CoeusBase):
             self.optimizer = optim.Adam(self.parameters(), lr=5e-5)
             self.criterion = nn.CrossEntropyLoss()
         else:
-            # Load settings for inference
+            
             model_key = self.get_setting("model_key")
             if self.key != model_key:
                 raise ValueError(
                     f"Key mismatch: This model is optimized for '{model_key}' related questions, but the provided key is '{self.key}'."
                 )
-
+            
+            # Load settings for inference
             path_to_trained = self.get_setting("path_to_trained")
             self.load_state_dict(torch.load(path_to_trained))
             self.eval()
