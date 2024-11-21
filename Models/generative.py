@@ -40,7 +40,10 @@ class CoeusGenerative(nn.Module, CoeusBase):
             # Load settings for inference
             model_key = self.get_setting("model_key")
             if self.key != model_key:
-                return f"This model is Optimized for '{model_key}' related questions"
+                raise ValueError(
+                    f"Key mismatch: This model is optimized for '{model_key}' related questions, but the provided key is '{self.key}'."
+                )
+
             path_to_trained = self.get_setting("path_to_trained")
             self.load_state_dict(torch.load(path_to_trained))
             self.eval()
