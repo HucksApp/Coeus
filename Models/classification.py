@@ -8,7 +8,7 @@ import torch.optim as optim
 from PIL import Image
 import os
 import json
-from Models.utils.base import CoeusBase
+from Models.traits.base import CoeusBase
 
 
 class CoeusClassification(nn.Module, CoeusBase):

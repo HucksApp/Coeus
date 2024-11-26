@@ -14,7 +14,7 @@ from torchvision import transforms
 from torchvision.transforms import functional as F
 import torchvision.transforms as T
 from sklearn.metrics import average_precision_score, precision_recall_curve
-from Models.utils.base import CoeusBase
+from Models.traits.base import CoeusBase
 
 
 class CoeusIdentification(nn.Module, CoeusBase):
