@@ -8,3 +8,4 @@ __pycache__
 /test_data
 Models/trained/*/*.pth
 /unprocessed
+.env
