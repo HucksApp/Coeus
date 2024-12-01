@@ -23,6 +23,10 @@ class CoeusVideoCreator(nn.Module, CoeusModelKeys):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.title = title
 
+
+        self.save_dir = os.path.join(save_dir, "video_generate")
+        os.makedirs(self.save_dir, exist_ok=True)
+
         # Directory paths
         self.save_dir = os.path.join(save_dir, title)
         os.makedirs(self.save_dir, exist_ok=True)

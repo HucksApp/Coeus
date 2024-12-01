@@ -6,18 +6,14 @@ from bs4 import BeautifulSoup
 import requests
 import re
 from concurrent.futures import ThreadPoolExecutor
-import googleapiclient.discovery
+
 
 class CoeusSearch:
-    def __init__(self, save_dir, title=None, google_api_key=None, google_cx=None):
+    def __init__(self, save_dir, title=None):
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         self.cache_file = os.path.join(self.save_dir, "search_results.json")
         self.search_results = []
-        
-        # Google Search API credentials (if provided)
-        self.google_api_key = google_api_key
-        self.google_cx = google_cx
 
         # Load cached results
         self._load_cache()
@@ -63,24 +59,6 @@ class CoeusSearch:
                 return self._parse_search_results(html, source="DuckDuckGo")
         return []
 
-    def _search_google(self, query, num_results=10):
-        """Search Google using the Google Custom Search API."""
-        if not self.google_api_key or not self.google_cx:
-            print("Google API key or Custom Search Engine ID not provided.")
-            return []
-        
-        service = googleapiclient.discovery.build("customsearch", "v1", developerKey=self.google_api_key)
-        res = service.cse().list(q=query, cx=self.google_cx, num=num_results).execute()
-        results = [
-            {
-                "title": item["title"],
-                "url": item["link"],
-                "source": "Google",
-            }
-            for item in res.get("items", [])
-        ]
-        return results
-
     def _parse_search_results(self, html, source):
         """Parse search results using BeautifulSoup."""
         soup = BeautifulSoup(html, "lxml")
@@ -102,12 +80,6 @@ class CoeusSearch:
             self._search_bing(query, num_results),
             self._search_duckduckgo(query, num_results),
         ]
-        
-        # Include Google search if API keys are provided
-        if self.google_api_key and self.google_cx:
-            google_results = self._search_google(query, num_results)
-            tasks.append(asyncio.to_thread(lambda: google_results))  # Run Google search in a separate thread (sync)
-        
         results = await asyncio.gather(*tasks)
         return [item for sublist in results for item in sublist]
 
@@ -153,3 +125,4 @@ class CoeusSearch:
 
         with ThreadPoolExecutor() as executor:
             executor.map(download_article, self.search_results)
+

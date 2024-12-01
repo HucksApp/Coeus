@@ -18,7 +18,7 @@ class CoeusClassification(nn.Module, CoeusBase):
         # Title-based settings for the model
         self.title = title
 
-        self.save_dir = os.path.join(self.save_dir, "classify")
+        self.save_dir = os.path.join(save_dir, "classify")
         os.makedirs(self.save_dir, exist_ok=True)
 
         self.save_dir = os.path.join(save_dir, title) if title else save_dir
@@ -145,7 +145,8 @@ class CoeusClassification(nn.Module, CoeusBase):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             print(f"Resuming from epoch {start_epoch}")
-
+        else:
+            print(f"Starting a new Training ...")
         for epoch in range(start_epoch, start_epoch + epochs_per_run):
             self.train()
             running_loss = 0.0

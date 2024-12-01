@@ -5,7 +5,7 @@ from data_sanitation.CheckImage import removeCorruptedImages
 if __name__ == '__main__':
     training = True
     data_dir = './data/Toyota/toyota_cars'
-    save_dir = './Models/trained/classify'
+    save_dir = './Models/trained/'
     test_image = './test_data/test33.jpeg'
 
     if training:
