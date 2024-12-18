@@ -4,7 +4,9 @@ import json
 import re
 from transformers import pipeline, AutoModelForQuestionAnswering, AutoTokenizer
 import transformers
+from sentence_transformers import SentenceTransformer, util
 import spacy
+import camelot
 import shutil
 import pytesseract
 from PIL import Image
@@ -15,6 +17,7 @@ from spacy.cli import download
 import torch.multiprocessing as mp
 import argparse
 import logging
+from .keywords import keyword_patterns as kp
 
 
 class CoeusPdfProcessor:
@@ -49,17 +52,23 @@ class CoeusPdfProcessor:
                 "question-answering", model=self.model, tokenizer=self.tokenizer)
             self.summarizer = pipeline(
                 "summarization", model="facebook/bart-large-cnn")
+            
+            self.nlp = SentenceTransformer("all-MiniLM-L6-v2")
 
         # Extract data
-        self.text, self.structure = self.extract_pdf_text_structure(
-            pdf_path) if pdf_path else ("", [])
-        self.images = self.extract_pdf_images(pdf_path) if pdf_path else []
-        self.sections = self.categorize_pdf_content(self.text, self.structure)
-        self.problem_solution_map = self.build_problem_solution_map()
+        if pdf_path:
+            self.structure = self.extract_pdf_text_structure(
+                pdf_path) if pdf_path else ("", [])
+            
+        
+        #     self.sections = self.categorize_pdf_content(self.structure)
+        #     print(self.sections)
+        #     self.images = self.extract_pdf_images(pdf_path) if pdf_path else []
+        #     self.problem_solution_map = self.build_problem_solution_map()
 
-        # Generate dataset if required
-        if to_dataset:
-            self.generate_and_save_dataset()
+        # # Generate dataset if required
+        #     if to_dataset:
+        #         self.generate_and_save_dataset()
 
     def extract_pdf_text_structure(self, pdf_path):
         """Extract hierarchical text structure from the PDF."""
@@ -69,23 +78,36 @@ class CoeusPdfProcessor:
             self.logger.error(f"Failed to open PDF file: {pdf_path} with {e}")
             raise ValueError(f"Failed to open PDF file: {pdf_path}") from e
         
-        content_structure = []
-        for page_num, page in enumerate(doc, start=1):
-            blocks = page.get_text("dict")["blocks"]
-            for block in blocks:
-                if block["type"] == 0:  # Text block
-                    lines = block["lines"]
-                    for line in lines:
-                        spans = line["spans"]
-                        for span in spans:
-                            content_structure.append({
-                                "text": span["text"],
-                                "font_size": span.get("size", 0),
-                                "page": page_num,
-                                "bbox": block["bbox"],
-                                "type": "text"
-                            })
-        return content_structure
+        #print(doc.metadata, "-------------------1\n")
+        print(doc.get_toc(False), "---------------2 \n")
+
+
+        # content_structure = []
+        # current_heading = None
+
+        # for page_num, page in enumerate(doc, start=1):
+        #     blocks = page.get_text("dict")["blocks"]
+        #     for block in blocks:
+        #         if block["type"] == 0:  # Text block
+        #             lines = block["lines"]
+        #             for line in lines:
+        #                 spans = line["spans"]
+        #                 for span in spans:
+        #                     text = span["text"].strip()
+        #                     font_size = span.get("size", 0)
+
+        #                     if font_size > 12:  # Assume larger font sizes are headings
+        #                         if current_heading:
+        #                             content_structure.append(current_heading)
+        #                         current_heading = {"heading": text, "content": [], "page": page_num}
+        #                     elif current_heading:
+        #                         current_heading["content"].append(text)
+        
+        # if current_heading:
+        #     content_structure.append(current_heading)
+        
+        # return content_structure
+
 
 
     def extract_pdf_images(self, pdf_path):
@@ -119,71 +141,122 @@ class CoeusPdfProcessor:
                               "ocr_text": ocr_text.strip()})
         return images
 
-    def categorize_pdf_content(self, text, structure):
-        """Categorize text using headings and keywords."""
+    def associate_images_with_text(images, text_structure):
+        """Link images to their closest text content."""
+        associations = []
+        for img in images:
+            page_num = img["page"]
+            text_on_page = [t for t in text_structure if t["page"] == page_num]
+            if text_on_page:
+                associations.append({"image": img, "text": " ".join(t["text"] for t in text_on_page)})
+        return associations
+    
+    def generate_image_captions(self):
+        """Generate captions for images using OCR and NLP."""
+        captions = []
+        for img in self.images:
+            if img["ocr_text"]:
+                caption = self.summarize_section(img["ocr_text"])
+                captions.append({"image_path": img["path"], "caption": caption})
+        return captions
+
+    def extract_tables_from_pdf(pdf_path):
+        """Extract tables from PDF using Camelot."""
+        tables = camelot.read_pdf(pdf_path, pages="all", flavor="stream")
+        table_data = [table.df.to_dict(orient="records") for table in tables]
+        return table_data
+
+    def categorize_pdf_content(self, structure):
+        """Categorize text using headings and keywords with regex support."""
         sections = []
         current_category = None
         current_text = ""
-        keywords = {
-            "installation": ["install", "setup", "mount"],
-            "repair": ["repair", "fix", "issue", "fault"],
-            "qa": ["question", "answer", "how to"],
-            "maintenance": ["maintain", "routine", "schedule"]
-        }
-
+        
+        # Define regex patterns for keywords
+        keyword_patterns = kp
+        # Compile regex patterns for performance
+        compiled_patterns = {category: [re.compile(pattern, re.IGNORECASE) for pattern in patterns]
+                            for category, patterns in keyword_patterns.items()}
+        #print(compiled_patterns)
+        
+        last_item=None
         for item in structure:
+            last_item = item
             line = item["text"]
-            for category, terms in keywords.items():
-                if any(term in line.lower() for term in terms):
-                    if current_category:
-                        sections.append(
-                            {"category": current_category, "text": current_text.strip()})
-                    current_category = category
-                    current_text = line + "\n"
+            matched_category = None
+
+            # Check each category's patterns
+            for category, patterns in compiled_patterns.items():
+                if any(pattern.search(line) for pattern in patterns):
+                    print(f" matched category {category}")
+                    matched_category = category
                     break
+
+            if matched_category:
+                if current_category:  # If there's an existing category, save it
+                    sections.append({
+                        "heading": item["heading"],
+                        "category": current_category,
+                        "text": current_text.strip()
+                    })
+                current_category = matched_category
+                current_text = line + "\n"
             else:
                 if current_category:
                     current_text += line + "\n"
 
+        # Append the last collected text to its category
         if current_category and current_text.strip():
-            sections.append({"category": current_category,
-                            "text": current_text.strip()})
+            sections.append({"category": current_category, "text": current_text.strip(), "heading": last_item["heading"]})
         return sections
+
 
     def build_problem_solution_map(self):
         """Map problems to solutions."""
         problem_solution_map = []
         for section in self.sections:
-            if section["category"] in ["repair", "qa"]:
+            if section["category"] == "qa":
                 if self.use_spacy:
                     doc = self.nlp(section["text"])
                     problems = [
                         sent.text for sent in doc.sents if "problem" in sent.text.lower()]
                     solutions = [
                         sent.text for sent in doc.sents if "solution" in sent.text.lower()]
-                else:
-                    problems = [self.summarize_section(section["text"])]
-                    solutions = ["Solution unavailable."]
-
-                for prob, sol in zip(problems, solutions):
-                    problem_solution_map.append(
+                    for prob, sol in zip(problems, solutions):
+                        problem_solution_map.append(
                         {"problem": prob, "solution": sol})
+                else:
+                    problems = [sent for sent in section["text"].split(".") if "problem" in sent.lower()]
+                    solutions = [sent for sent in section["text"].split(".") if "solution" in sent.lower()]
+                    for prob in problems:
+                        prob_embedding = self.nlp.encode(prob, convert_to_tensor=True)
+                        closest_solution = None
+                        max_similarity = -1
+                        for sol in solutions:
+                            sol_embedding = self.nlp.encode(sol, convert_to_tensor=True)
+                            similarity = util.pytorch_cos_sim(prob_embedding, sol_embedding)
+                            if similarity > max_similarity:
+                                max_similarity = similarity
+                                closest_solution = sol
+                        if closest_solution:
+                            problem_solution_map.append({"problem": prob, "solution": closest_solution})
+
         return problem_solution_map
 
     def generate_and_save_dataset(self):
         """Generate and save a QA dataset."""
         dataset = []
         for section in self.sections:
-            if section["category"] in ["qa", "repair"]:
-                question = f"What is the solution for: {
-                    section['text'][:50]}..."
-                answer = self.answer_question(question)
-                dataset.append({
-                    "question": question,
-                    "answer": answer,
-                    "images": self.get_images_for_category(section["category"]),
-                    "summary": self.summarize_section(section["text"])
-                })
+            #if section["category"] == "qa":
+            question = f"What is the solution for: {
+                section['text'][:50]}..."
+            answer = self.answer_question(question)
+            dataset.append({
+                "question": question,
+                "answer": answer,
+                "images": self.get_images_for_category(section["category"]),
+                "summary": self.summarize_section(section["text"])
+            })
         dataset_path = os.path.join(self.save_dir, "qa_dataset.json")
         with open(dataset_path, "w") as f:
             json.dump(dataset, f, indent=4)
@@ -254,6 +327,7 @@ class CoeusPdfProcessor:
         # Batch processing with multi-threading
         def process_pdf(pdf_file):
             pdf_path = os.path.join(directory_path, pdf_file)
+            print(f"Processing: {pdf_path}")
             self.logger.info(f"Processing: {pdf_path}")
 
             try:
@@ -262,6 +336,7 @@ class CoeusPdfProcessor:
                 with open(os.path.join(self.save_dir, "qa_dataset.json"), "r") as f:
                     all_datasets.extend(json.load(f))
             except Exception as e:
+                print(f"Error processing {pdf_path}: {e}")
                 self.logger.error(f"Error processing {pdf_path}: {e}")
 
         for pdf_file in os.listdir(directory_path):
@@ -274,8 +349,9 @@ class CoeusPdfProcessor:
             thread.join()
 
         # Save all combined datasets
-        with open(os.path.join(self.save_dir, "combined_qa_dataset.json"), "w") as f:
+        with open(os.path.join(self.save_dir, "qa_dataset.json"), "w") as f:
             json.dump(all_datasets, f, indent=4)
+        print(f"Combined dataset saved with {len(all_datasets)} question-answer pairs.")
         self.logger.info(f"Combined dataset saved with {len(all_datasets)} question-answer pairs.")
 
 
@@ -298,3 +374,7 @@ if __name__ == "__main__":
             processor.generate_and_save_dataset()
     else:
         parser.print_help()
+
+
+
+#[2, 'GENERAL', 3, {'kind': 4, 'xref': 1665, 'page': '3', 'view': 'Fit', 'collapse': False, 'zoom': 0.0}]

@@ -10,24 +10,25 @@ save_dir = "./uprocessed"
 google_api_key = os.getenv('API_KEY')
 google_cx = os.getenv('CX')
 
-# # Initialize the collector
-# collector = CoeusPdfCollector(
-#     save_dir=save_dir,
-#     title="manual",
-#     google_api_key=google_api_key,
-#     google_cx=google_cx,
-#     cache_size=5000  # Optional: Adjust cache size
-# )
-
-# results = collector.collect_data(query="Toyota manual", num_results=1)
-# collector.render_data()
-# collector.download_pdfs()
-
-
-processor = CoeusPdfProcessor(
-    save_dir=f"{save_dir}/extracted",
+# Initialize the collector
+collector = CoeusPdfCollector(
+    save_dir=save_dir,
     title="manual",
-    to_dataset=True,
-    use_spacy=False
+    google_api_key=google_api_key,
+    google_cx=google_cx,
+    cache_size=5000  # Optional: Adjust cache size
 )
-processor.process_directory(f"{save_dir}/manual")
+
+results = collector.collect_data(query="Toyota service", num_results=100)
+collector.render_data()
+collector.download_pdfs()
+
+
+# processor = CoeusPdfProcessor(
+#     pdf_path=f"{save_dir}/manual/headfirst_js.pdf",
+#     save_dir=f"{save_dir}/extracted",
+#     title="manual",
+#     to_dataset=True,
+#     use_spacy=False
+# )
+#processor.process_directory(f"{save_dir}/manual")

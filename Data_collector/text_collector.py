@@ -256,7 +256,7 @@ class CoeusTextdataCollector:
             return {"problem": problem, "solution": solution}
         return None
 
-    def _save_as_dataset(self, qa_pairs, problem_solution_pairs):
+    def _save_to_dataset(self, qa_pairs, problem_solution_pairs):
         """Save the QA pairs and problem-solution data for AI model training."""
         # Example: Save to JSON file
         training_data = {
